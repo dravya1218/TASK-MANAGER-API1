@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+
+{% block title %}
+Admin Dashboard
+{% endblock %}
+
+{% block content %}
+
+<div class="container-fluid mt-4">
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+
+        <h2>Admin Dashboard</h2>
+
+        <a href="/dashboard" class="btn btn-secondary">
+
+            Back to Dashboard
+
+        </a>
+
+        <a href="/manage-permissions" class="btn btn-warning">
+            Manage Permissions
+        </a>
+
+    </div>
+
+    <!-- Statistics -->
+
+    <div class="row mb-4">
+
+        <div class="col-md-4">
+
+            <div class="card text-bg-primary shadow">
+
+                <div class="card-body text-center">
+
+                    <h5>Total Users</h5>
+
+                    <h2 id="totalUsers">
+
+                        0
+
+                    </h2>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+    <!-- User Table -->
+
+    <div class="card shadow">
+
+        <div class="card-header">
+
+            <h5 class="mb-0">
+
+                Users
+
+            </h5>
+
+        </div>
+
+        <div class="card-body">
+
+            <div class="row mb-3">
+
+                <div class="col-md-4">
+
+                        <input
+                    type="text"
+                    id="searchUser"
+                    class="form-control"
+                    placeholder="Search username or email">
+
+                </div>
+
+            </div>
+
+            <table class="table table-bordered table-striped">
+
+                <thead class="table-dark">
+
+                    <tr>
+
+                        <th>ID</th>
+
+                        <th>Username</th>
+
+                        <th>Email</th>
+
+                        <th>Role</th>
+                        <th>Action</th>
+                        
+                    </tr>
+
+                </thead>
+
+                <tbody id="userTable">
+
+                    <tr>
+
+                        <td colspan="4" class="text-center">
+
+                            Loading...
+
+                        </td>
+
+                    </tr>
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </div>
+
+</div>
+
+<script src="{{ url_for('static', filename='js/auth.js') }}"></script>
+<script src="{{ url_for('static', filename='js/admin.js') }}"></script>
+
+{% endblock %}

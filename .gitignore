@@ -1,0 +1,8 @@
+.env
+.venv/
+.venv-1/
+__pycache__/
+routes/__pycache__/
+*.pyc
+task_manger.db
+task_manger.sqbpro

@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <link rel="stylesheet"
+        href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <meta charset="UTF-8">
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>
+        {% block title %}
+        Task Manager
+        {% endblock %}
+    </title>
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+
+</head>
+
+<body class="bg-light">
+
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+
+    <div class="container">
+
+        <a class="navbar-brand" href="/dashboard">
+            Task Manager
+        </a>
+
+            <div
+                id="authNav"
+                class="ms-auto d-flex align-items-center gap-2">
+
+                <a
+                    id="dashboardLink"
+                    href="/dashboard"
+                    class="btn btn-{{ 'light' if request.path == '/dashboard' else 'outline-light' }} btn-sm">
+                    Dashboard
+                </a>
+
+                <a
+                    id="profileLink"
+                    href="/profile"
+                    class="btn btn-{{ 'light' if request.path == '/profile' else 'outline-light' }} btn-sm">
+                    Profile
+                </a>
+
+                <button
+                    id="logoutBtn"
+                    class="btn btn-outline-light btn-sm">
+                    Logout
+                </button>
+
+                <a
+                    id="loginLink"
+                    href="/login"
+                    class="btn btn-{{ 'light' if request.path == '/' or request.path == '/login' else 'outline-light' }} btn-sm">
+                    Login
+                </a>
+
+                <a
+                    id="registerLink"
+                    href="/register"
+                    class="btn btn-{{ 'light' if request.path == '/register' else 'outline-light' }} btn-sm">
+                    Register
+                </a>
+
+            </div>
+
+    </div>
+
+</nav>
+
+<div class="container mt-4">
+
+    {% block content %}
+    {% endblock %}
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/js/bootstrap.bundle.min.js"></script>
+
+<!-- Bootstrap Toast -->
+<div class="toast-container position-fixed top-0 end-0 p-3">
+
+    <div
+        id="appToast"
+        class="toast align-items-center text-bg-primary border-0"
+        role="alert">
+
+        <div class="d-flex">
+
+            <div
+                class="toast-body"
+                id="toastMessage">
+
+                Message
+
+            </div>
+
+            <button
+                type="button"
+                class="btn-close btn-close-white me-2 m-auto"
+                data-bs-dismiss="toast">
+            </button>
+
+        </div>
+
+    </div>
+
+</div>
+
+<script src="{{ url_for('static', filename='js/auth.js') }}"></script>
+
+<script src="{{ url_for('static', filename='js/toast.js') }}"></script>
+
+{% block scripts %}
+{% endblock %}
+
+
+</body>
+
+</html>
