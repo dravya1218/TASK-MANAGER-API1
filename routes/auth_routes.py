@@ -31,7 +31,7 @@ def resend_verification():
 
     data = request.get_json(silent=True)
 
-    if not data:
+    if data is None:
         return jsonify({
             "error": "JSON body is required"
         }), 400
@@ -60,7 +60,7 @@ def verify_email():
 
     data = request.get_json(silent=True)
 
-    if not data:
+    if data is None:
         return jsonify({
             "error": "JSON body is required"
         }), 400
@@ -108,7 +108,7 @@ def forgot_password():
 
     data = request.get_json(silent=True)
 
-    if not data:
+    if data is None:
         return jsonify({
             "error": "JSON body is required"
         }), 400
@@ -137,7 +137,7 @@ def verify_password_reset():
 
     data = request.get_json(silent=True)
 
-    if not data:
+    if data is None:
         return jsonify({
             "error": "JSON body is required"
         }), 400
@@ -186,7 +186,7 @@ def reset_password():
 
     data = request.get_json(silent=True)
 
-    if not data:
+    if data is None:
         return jsonify({
             "error": "JSON body is required"
         }), 400
@@ -237,7 +237,7 @@ def verify_email_change():
 
     data = request.get_json(silent=True)
 
-    if not data:
+    if data is None:
         return jsonify({
             "error": "JSON body is required"
         }), 400
@@ -334,7 +334,7 @@ def change_password():
     user_id = get_jwt_identity()
     data = request.get_json(silent=True)
 
-    if not data:
+    if data is None:
         return jsonify({"error": "JSON body is required"}), 400
 
     current_password = data.get("current_password")

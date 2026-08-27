@@ -742,7 +742,9 @@ def get_profile_service(user_id):
     if not user:
         return "User not found", None
 
-    return None, dict(user)
+    profile = dict(user)
+    profile.pop("password_hash", None)
+    return None, profile
 
 def update_profile_service(user_id, data):
 

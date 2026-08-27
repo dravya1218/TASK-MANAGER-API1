@@ -6,3 +6,7 @@ routes/__pycache__/
 *.pyc
 task_manger.db
 task_manger.sqbpro
+.pytest_cache/
+.pytest_tmp/
+.pytest-tmp/
+tests/_unused_bootstrap.db

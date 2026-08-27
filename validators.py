@@ -3,7 +3,10 @@ from datetime import datetime
 
 def validate_task_data(data):
 
-    if not data:
+    if data is None:
+        return "JSON body is required"
+
+    if not isinstance(data, dict):
         return "JSON body is required"
 
     if "title" not in data:
@@ -99,7 +102,7 @@ def validate_task_data(data):
 
 def validate_registration_data(data):
 
-    if not data:
+    if data is None:
         return "JSON body is required"
 
     if not isinstance(data, dict):
@@ -164,7 +167,7 @@ def validate_registration_data(data):
 
 
 def validate_login_data(data):
-    if not data:
+    if data is None or not isinstance(data, dict):
         return "cannot be empty"
     reqiured_felid=["email","password"]
     for feild in reqiured_felid:

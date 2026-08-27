@@ -1,7 +1,8 @@
 import os
 
 from dotenv import load_dotenv
-from flask import Flask,jsonify
+from flask import Flask,jsonify,request
+from flask_jwt_extended import decode_token
 from extensions import jwt
 from datetime import timedelta
 from validators import *
@@ -23,6 +24,26 @@ if not app.config["JWT_SECRET_KEY"]:
 initialize_database()
 app.config["JWT_ACCESS_TOKEN_EXPIRES"]=timedelta(minutes=30)
 jwt.init_app(app)
+
+@app.before_request
+def reject_password_reset_tokens_as_session():
+    if request.path == "/api/reset-password":
+        return None
+
+    auth = request.headers.get("Authorization", "")
+    parts = auth.split()
+    if len(parts) != 2 or parts[0].lower() != "bearer":
+        return None
+
+    try:
+        claims = decode_token(parts[1])
+    except Exception:
+        return None
+
+    if claims.get("purpose") == "password_reset":
+        return jsonify({
+            "error": "Invalid password reset token"
+        }), 403
 
 @jwt.token_in_blocklist_loader
 def check_if_token_revoked(jwt_header,jwt_payload):

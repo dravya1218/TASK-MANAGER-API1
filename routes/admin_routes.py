@@ -16,7 +16,7 @@ def remove_user(user_id):
 
     current_user_id = get_jwt_identity()
 
-    if current_user_id == user_id:
+    if str(current_user_id) == str(user_id):
         return jsonify({
             "error": "You cannot delete your own account."
         }), 400
@@ -73,7 +73,7 @@ def change_user_role(user_id):
     current_user_id = get_jwt_identity()
 
     # Prevent admin from changing their own role
-    if current_user_id == user_id:
+    if str(current_user_id) == str(user_id):
 
         return jsonify({
             "error": "You cannot change your own role."
