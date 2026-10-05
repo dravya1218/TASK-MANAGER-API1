@@ -1,6 +1,10 @@
 import os
 
 from dotenv import load_dotenv
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+load_dotenv(os.path.join(BASE_DIR, ".env"))
+
 from flask import Flask,jsonify,request
 from flask_jwt_extended import decode_token
 from extensions import jwt
@@ -13,9 +17,12 @@ from routes.auth_routes import auth_bp
 from extensions import block_list
 from routes.admin_routes import admin_bp
 from routes.frontend_routes import frontend_bp
-load_dotenv()
 
-app=Flask(__name__)
+app=Flask(
+    __name__,
+    template_folder=os.path.join(BASE_DIR, "templates"),
+    static_folder=os.path.join(BASE_DIR, "static"),
+)
 app.config["JWT_SECRET_KEY"] = os.getenv("JWT_SECRET_KEY")
 
 if not app.config["JWT_SECRET_KEY"]:

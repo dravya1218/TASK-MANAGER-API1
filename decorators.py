@@ -1,4 +1,5 @@
 from functools import wraps
+import os
 from flask import jsonify
 from flask_jwt_extended import get_jwt
 from database import role_has_permission

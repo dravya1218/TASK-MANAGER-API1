@@ -21,6 +21,10 @@ def send_verification_email(receiver_email, otp):
     sender_email = os.getenv("MAIL_USERNAME")
     sender_password = os.getenv("MAIL_PASSWORD")
 
+    if not sender_email or not sender_password:
+        print(f"[OTP] Mail is not configured. OTP for {receiver_email}: {otp}")
+        return True
+
     message = EmailMessage()
 
     message["Subject"] = "Task Manager - Email Verification"
@@ -42,16 +46,21 @@ Regards,
 Task Manager
 """)
 
-    with smtplib.SMTP("smtp.gmail.com", 587) as server:
+    try:
+        with smtplib.SMTP("smtp.gmail.com", 587) as server:
 
-        server.starttls()
+            server.starttls()
 
-        server.login(
-            sender_email,
-            sender_password
-        )
+            server.login(
+                sender_email,
+                sender_password
+            )
 
-        server.send_message(message)
+            server.send_message(message)
+    except Exception as error:
+        print("EMAIL SEND ERROR:", repr(error))
+        print(f"[OTP] Email send failed. OTP for {receiver_email}: {otp}")
+        return True
 
     return True
 

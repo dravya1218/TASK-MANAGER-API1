@@ -48,6 +48,22 @@
                     Profile
                 </a>
 
+                <a
+                    id="adminDashboardLink"
+                    href="/admin"
+                    style="display: none;"
+                    class="btn btn-{{ 'light' if request.path == '/admin' else 'outline-light' }} btn-sm">
+                    Admin Dashboard
+                </a>
+
+                <a
+                    id="managePermissionsLink"
+                    href="/manage-permissions"
+                    style="display: none;"
+                    class="btn btn-{{ 'light' if request.path == '/manage-permissions' else 'outline-light' }} btn-sm">
+                    Manage Permissions
+                </a>
+
                 <button
                     id="logoutBtn"
                     class="btn btn-outline-light btn-sm">

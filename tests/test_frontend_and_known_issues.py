@@ -29,6 +29,22 @@ def test_frontend_pages_reject_post(client):
     assert client.post("/register").status_code == 405
 
 
+def test_admin_nav_links_are_in_layout_but_hidden_by_default(client):
+    html = client.get("/dashboard").get_data(as_text=True)
+    assert 'id="adminDashboardLink"' in html
+    assert 'href="/admin"' in html
+    assert 'id="managePermissionsLink"' in html
+    assert 'href="/manage-permissions"' in html
+    assert html.count('style="display: none;"') >= 2
+
+
+def test_admin_dashboard_uses_navbar_instead_of_page_permission_button(client):
+    html = client.get("/admin").get_data(as_text=True)
+    assert "Manage Permissions" in html
+    assert 'id="managePermissionsLink"' in html
+    assert 'class="btn btn-warning"' not in html
+
+
 def test_profile_should_not_include_password_hash(client, user_a):
     body = client.get("/api/profile", headers=user_a["headers"]).get_json()
     assert "password_hash" not in body

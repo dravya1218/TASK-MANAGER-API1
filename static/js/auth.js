@@ -124,11 +124,14 @@ function updateNavbar() {
 
     const dashboardLink = document.getElementById("dashboardLink");
     const profileLink = document.getElementById("profileLink");
+    const adminDashboardLink = document.getElementById("adminDashboardLink");
+    const managePermissionsLink = document.getElementById("managePermissionsLink");
     const logoutBtn = document.getElementById("logoutBtn");
     const loginLink = document.getElementById("loginLink");
     const registerLink = document.getElementById("registerLink");
 
     const loggedIn = !!getAccessToken();
+    const isAdmin = loggedIn && localStorage.getItem("role") === "admin";
 
     if (dashboardLink) {
         dashboardLink.style.display =
@@ -138,6 +141,16 @@ function updateNavbar() {
     if (profileLink) {
         profileLink.style.display =
             loggedIn ? "inline-block" : "none";
+    }
+
+    if (adminDashboardLink) {
+        adminDashboardLink.style.display =
+            isAdmin ? "inline-block" : "none";
+    }
+
+    if (managePermissionsLink) {
+        managePermissionsLink.style.display =
+            isAdmin ? "inline-block" : "none";
     }
 
     if (logoutBtn) {

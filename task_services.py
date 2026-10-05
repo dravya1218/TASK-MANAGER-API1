@@ -4,7 +4,7 @@ from database import *
 from werkzeug.security import generate_password_hash,check_password_hash
 from datetime import datetime, timedelta, timezone
 from routes.email_service import send_verification_email
-
+import os
 
 def login_user_service(data):
     email=data["email"]
@@ -193,7 +193,7 @@ def registration_user_service(data):
 
     otp = generate_otp()
 
-    expires_at = datetime.now() + timedelta(minutes=10)
+    expires_at = datetime.now(timezone.utc) + timedelta(minutes=10)
 
     success = insert_otp(
         user_id,
@@ -247,10 +247,7 @@ def verify_email_otp_service(user_id, otp):
     # Check expiration
     
     try:
-        expiry_time = datetime.fromisoformat(expires_at)
-
-        if expiry_time.tzinfo is None:
-            expiry_time = expiry_time.replace(tzinfo=timezone.utc)
+        expiry_time = parse_otp_datetime(expires_at)
 
     except (ValueError, TypeError):
         return "Invalid OTP expiration time"
@@ -324,11 +321,7 @@ def resend_email_verification_otp(email):
     if last_otp:
 
         try:
-            created_at = datetime.fromisoformat(
-                last_otp["created_at"]
-            )
-
-            created_at = created_at.replace(tzinfo=timezone.utc)
+            created_at = parse_otp_datetime(last_otp["created_at"])
 
         except (ValueError, TypeError):
             return "Invalid OTP creation time"
@@ -399,14 +392,7 @@ def resend_email_change_otp(user_id):
     if last_otp:
 
         try:
-            created_at = datetime.fromisoformat(
-                last_otp["created_at"]
-            )
-
-            if created_at.tzinfo is None:
-                created_at = created_at.replace(
-                    tzinfo=timezone.utc
-                )
+            created_at = parse_otp_datetime(last_otp["created_at"])
 
         except (ValueError, TypeError):
 
@@ -491,15 +477,7 @@ def request_password_reset_otp(email):
     if last_otp:
 
         try:
-            created_at = datetime.fromisoformat(
-                last_otp["created_at"]
-            )
-
-            if created_at.tzinfo is None:
-                created_at = created_at.replace(
-                    tzinfo=timezone.utc
-
-                )
+            created_at = parse_otp_datetime(last_otp["created_at"])
 
         except (ValueError, TypeError):
             return "Invalid OTP creation time"
@@ -572,9 +550,7 @@ def verify_password_reset_otp_service(email, otp):
         return "Too many incorrect attempts. Please request a new OTP", None  # Changed here
 
     try:
-        expiry_time = datetime.fromisoformat(expires_at)
-        if expiry_time.tzinfo is None:
-            expiry_time = expiry_time.replace(tzinfo=timezone.utc)
+        expiry_time = parse_otp_datetime(expires_at)
     except (ValueError, TypeError):
         return "Invalid OTP expiration time", None  # Changed here
 
@@ -915,14 +891,7 @@ def verify_email_change_otp_service(user_id, otp):
 
     try:
 
-        expiry_time = datetime.fromisoformat(
-            expires_at
-        )
-
-        if expiry_time.tzinfo is None:
-            expiry_time = expiry_time.replace(
-                tzinfo=timezone.utc
-            )
+        expiry_time = parse_otp_datetime(expires_at)
 
     except (ValueError, TypeError):
 
@@ -1049,6 +1018,19 @@ def delete_category_service(user_id, category_id):
 
 def generate_otp():
     return str(secrets.randbelow(900000) + 100000)
+
+
+def parse_otp_datetime(value):
+    if isinstance(value, datetime):
+        dt = value
+    else:
+        text = str(value).strip().replace("Z", "+00:00")
+        if "T" not in text:
+            text = text.replace(" ", "T", 1)
+        dt = datetime.fromisoformat(text)
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
 
 
 

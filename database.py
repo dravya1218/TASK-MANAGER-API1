@@ -1,5 +1,17 @@
 import sqlite3
-table="task_manger.db"
+import os
+from datetime import datetime, timezone
+from dotenv import load_dotenv
+
+load_dotenv()
+table=os.getenv("DATABASE_PATH","task_manger.db")
+
+def _store_timestamp(value):
+    if isinstance(value, datetime):
+        if value.tzinfo is not None:
+            value = value.astimezone(timezone.utc).replace(tzinfo=None)
+        return value.strftime("%Y-%m-%d %H:%M:%S")
+    return value
 
 def get_connetion():
     conn=sqlite3.connect(table)
@@ -160,6 +172,7 @@ def create_otp_table():
 
 def insert_otp(user_id, otp, purpose, expires_at):
 
+    create_otp_table()
     conn = get_connetion()
 
     try:
@@ -176,7 +189,7 @@ def insert_otp(user_id, otp, purpose, expires_at):
             user_id,
             otp,
             purpose,
-            expires_at
+            _store_timestamp(expires_at)
         ))
 
         conn.commit()
