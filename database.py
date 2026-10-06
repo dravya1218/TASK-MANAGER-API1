@@ -1,10 +1,13 @@
-import sqlite3
+
 import os
+import libsql_client as sqlite3
 from datetime import datetime, timezone
 from dotenv import load_dotenv
 
 load_dotenv()
-table=os.getenv("DATABASE_PATH","task_manger.db")
+db_url = os.getenv("TURSO_DATABASE_URL")
+db_token = os.getenv("TURSO_AUTH_TOKEN")
+
 
 def _store_timestamp(value):
     if isinstance(value, datetime):
@@ -13,23 +16,35 @@ def _store_timestamp(value):
         return value.strftime("%Y-%m-%d %H:%M:%S")
     return value
 
+
+def _as_dict(row):
+    if row is None:
+        return None
+    return row.asdict()
+
+
 def get_connetion():
-    conn=sqlite3.connect(table)
-    conn.execute("PRAGMA foreign_keys = ON")
+
+    if not db_url:
+        raise ValueError("Database URL is not set")
+    if not db_token:
+        raise ValueError("Database token is not set")
+
+    conn = sqlite3.create_client_sync(url=db_url, auth_token=db_token)
     return conn
 
+
 def create_permission_table():
-    conn=get_connetion()
+    conn = get_connetion()
     conn.execute("""CREATE TABLE IF NOT EXISTS permissions(
                  id INTEGER PRIMARY KEY AUTOINCREMENT,
                  name TEXT NOT NULL UNIQUE)""")
-    conn.commit()
     conn.close()
 
+
 def seed_permission():
-    conn=get_connetion()
-    cursor=conn.cursor()
-    cursor.execute("""INSERT OR IGNORE INTO permissions (name)
+    conn = get_connetion()
+    conn.execute("""INSERT OR IGNORE INTO permissions (name)
                    VALUES ('create_task'),
                         ('view_task'),
                         ('update_task'),
@@ -38,26 +53,23 @@ def seed_permission():
                         ('view_user_task_count'),
                         ('update_user'),
                         ('delete_user'),
-                        ('manage_roles')""")    
-    conn.commit()
+                        ('manage_roles')""")
     conn.close()
 
+
 def create_role_permissions():
-    conn=get_connetion()
+    conn = get_connetion()
     conn.execute("""CREATE TABLE IF NOT EXISTS role_permissions(
                  role_id INTEGER NOT NULL,
                  permission_id INTEGER NOT NULL,
                  UNIQUE(role_id,permission_id),
                  FOREIGN KEY (role_id) REFERENCES roles(id),
                  FOREIGN KEY (permission_id) REFERENCES permissions(id))""")
-    conn.commit()
     conn.close()
 
 
 def create_user_table():
-
     conn = get_connetion()
-
     conn.execute("""
         CREATE TABLE IF NOT EXISTS users(
 
@@ -81,35 +93,29 @@ def create_user_table():
             REFERENCES roles(id)
         )
     """)
-
-    conn.commit()
     conn.close()
 
 
 def create_role_table():
-    conn=get_connetion()
+    conn = get_connetion()
     conn.execute("""CREATE TABLE IF NOT EXISTS roles(
                  id INTEGER PRIMARY KEY AUTOINCREMENT,
                  name TEXT NOT NULL UNIQUE
                  )""")
-    conn.commit()
     conn.close()
+
 
 def seed_role():
-    conn=get_connetion()
-    cursor=conn.cursor()
-    cursor.execute("""INSERT OR IGNORE INTO roles (name)
+    conn = get_connetion()
+    conn.execute("""INSERT OR IGNORE INTO roles (name)
                    VALUES('admin'),('manager'),('user')""")
-    conn.commit()
     conn.close()
 
+
 def insert_user(username, email, password, role_id):
-
     conn = get_connetion()
-
     try:
-
-        cursor = conn.execute("""
+        result = conn.execute("""
             INSERT INTO users(
                 username,
                 email,
@@ -125,23 +131,15 @@ def insert_user(username, email, password, role_id):
             role_id,
             0
         ))
-
-        conn.commit()
-
-        return cursor.lastrowid
-
-    except sqlite3.IntegrityError:
-
+        return result.last_insert_rowid
+    except sqlite3.LibsqlError:
         return None
-
     finally:
-
         conn.close()
 
+
 def create_otp_table():
-
     conn = get_connetion()
-
     conn.execute("""
         CREATE TABLE IF NOT EXISTS otp_codes(
 
@@ -166,17 +164,13 @@ def create_otp_table():
             ON DELETE CASCADE
         )
     """)
-
-    conn.commit()
     conn.close()
 
-def insert_otp(user_id, otp, purpose, expires_at):
 
+def insert_otp(user_id, otp, purpose, expires_at):
     create_otp_table()
     conn = get_connetion()
-
     try:
-
         conn.execute("""
             INSERT INTO otp_codes(
                 user_id,
@@ -191,26 +185,17 @@ def insert_otp(user_id, otp, purpose, expires_at):
             purpose,
             _store_timestamp(expires_at)
         ))
-
-        conn.commit()
-
         return True
-
-    except sqlite3.Error:
+    except sqlite3.LibsqlError:
         return False
-
     finally:
         conn.close()
 
 
 def get_latest_otp(user_id, purpose):
-
     conn = get_connetion()
-    conn.row_factory = sqlite3.Row
-
     try:
-
-        row = conn.execute("""
+        result = conn.execute("""
             SELECT id, otp, expires_at, attempts, used
             FROM otp_codes
             WHERE user_id = ?
@@ -221,45 +206,30 @@ def get_latest_otp(user_id, purpose):
         """, (
             user_id,
             purpose
-        )).fetchone()
-
-        return row
-
+        ))
+        return _as_dict(result.rows[0] if result.rows else None)
     finally:
         conn.close()
 
 
 def increment_otp_attempts(otp_id):
-
     conn = get_connetion()
-
     try:
-
         conn.execute("""
             UPDATE otp_codes
             SET attempts = attempts + 1
             WHERE id = ?
         """, (otp_id,))
-
-        conn.commit()
-
         return True
-
-    except sqlite3.Error:
-
+    except sqlite3.LibsqlError:
         return False
-
     finally:
-
         conn.close()
 
 
 def invalidate_otp_codes(user_id, purpose):
-
     conn = get_connetion()
-
     try:
-
         conn.execute("""
             UPDATE otp_codes
             SET used = 1
@@ -270,27 +240,17 @@ def invalidate_otp_codes(user_id, purpose):
             user_id,
             purpose
         ))
-
-        conn.commit()
-
         return True
-
-    except sqlite3.Error:
-
+    except sqlite3.LibsqlError:
         return False
-
     finally:
         conn.close()
 
 
 def get_latest_otp_time(user_id, purpose):
-
     conn = get_connetion()
-    conn.row_factory = sqlite3.Row
-
     try:
-
-        row = conn.execute("""
+        result = conn.execute("""
             SELECT created_at
             FROM otp_codes
             WHERE user_id = ?
@@ -300,21 +260,16 @@ def get_latest_otp_time(user_id, purpose):
         """, (
             user_id,
             purpose
-        )).fetchone()
-
-        return row
-
+        ))
+        return _as_dict(result.rows[0] if result.rows else None)
     finally:
         conn.close()
 
 
 def get_valid_otp(user_id, otp, purpose):
-
     conn = get_connetion()
-    conn.row_factory = sqlite3.Row
     try:
-
-        row = conn.execute("""
+        result = conn.execute("""
             SELECT id, expires_at
             FROM otp_codes
             WHERE user_id = ?
@@ -327,67 +282,44 @@ def get_valid_otp(user_id, otp, purpose):
             user_id,
             otp,
             purpose
-        )).fetchone()
-
-        return row
-
+        ))
+        return _as_dict(result.rows[0] if result.rows else None)
     finally:
-
         conn.close()
 
+
 def mark_otp_used(otp_id):
-
     conn = get_connetion()
-
     try:
-
         conn.execute("""
             UPDATE otp_codes
             SET used = 1
             WHERE id = ?
         """, (otp_id,))
-
-        conn.commit()
-
         return True
-
-    except sqlite3.Error:
-
+    except sqlite3.LibsqlError:
         return False
-
     finally:
-
         conn.close()
 
+
 def verify_user_email(user_id):
-
     conn = get_connetion()
-
     try:
-
         conn.execute("""
             UPDATE users
             SET email_verified = 1
             WHERE id = ?
         """, (user_id,))
-
-        conn.commit()
-
         return True
-
-    except sqlite3.Error:
-
+    except sqlite3.LibsqlError:
         return False
-
     finally:
-
         conn.close()
 
 
 def update_user_password(user_id, password_hash):
-
     conn = get_connetion()
-
     try:
         conn.execute("""
             UPDATE users
@@ -397,56 +329,47 @@ def update_user_password(user_id, password_hash):
             password_hash,
             user_id
         ))
-
-        conn.commit()
-
         return True
-
-    except sqlite3.Error:
+    except sqlite3.LibsqlError:
         return False
-
     finally:
         conn.close()
 
-         
+
 def find_role_id_by_name(role_name):
-    conn=get_connetion()
-    conn.row_factory=sqlite3.Row
-    cursor=conn.cursor()
-    cursor.execute(""" SELECT (id) FROM roles WHERE name = ?""",(role_name,))
-    role=cursor.fetchone()
+    conn = get_connetion()
+    result = conn.execute(""" SELECT (id) FROM roles WHERE name = ?""", (role_name,))
+    role = _as_dict(result.rows[0] if result.rows else None)
     conn.close()
     if role is None:
         return None
     return role["id"]
 
+
 def find_permission_id_by_name(permission_name):
-    conn=get_connetion()
-    conn.row_factory=sqlite3.Row
-    cursor=conn.cursor()
-    cursor.execute(""" SELECT (id) FROM permissions WHERE name = ?""",(permission_name,))
-    permission=cursor.fetchone()
+    conn = get_connetion()
+    result = conn.execute(""" SELECT (id) FROM permissions WHERE name = ?""", (permission_name,))
+    permission = _as_dict(result.rows[0] if result.rows else None)
     conn.close()
     if permission is None:
         return None
     return permission["id"]
 
-def insert_role_permission(role_id,permission_id):
-    conn=get_connetion()
-    cursor=conn.cursor()
-    cursor.execute("""INSERT OR IGNORE INTO role_permissions(role_id,permission_id) VALUES(?,?)""",(role_id,permission_id))
-    conn.commit()
-    success=cursor.rowcount>0
+
+def insert_role_permission(role_id, permission_id):
+    conn = get_connetion()
+    result = conn.execute(
+        """INSERT OR IGNORE INTO role_permissions(role_id,permission_id) VALUES(?,?)""",
+        (role_id, permission_id)
+    )
+    success = result.rows_affected > 0
     conn.close()
     return success
 
+
 def create_task_table():
-
     conn = get_connetion()
-
-    cursor = conn.cursor()
-
-    cursor.execute("""
+    conn.execute("""
         CREATE TABLE IF NOT EXISTS tasks(
 
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -475,11 +398,9 @@ def create_task_table():
 
         )
     """)
-
-    conn.commit()
     conn.close()
 
-    
+
 def insert_task(
     user_id,
     title,
@@ -489,11 +410,8 @@ def insert_task(
     due_date,
     category_id
 ):
-
     conn = get_connetion()
-
     try:
-
         conn.execute(
             """
             INSERT INTO tasks
@@ -518,18 +436,12 @@ def insert_task(
                 category_id
             )
         )
-
-        conn.commit()
-
         return True
-
-    except sqlite3.IntegrityError:
-
+    except sqlite3.LibsqlError:
         return False
-
     finally:
-
         conn.close()
+
 
 def get_all_task(
     user_id,
@@ -542,10 +454,7 @@ def get_all_task(
     priority,
     category_id=None
 ):
-
     conn = get_connetion()
-    conn.row_factory = sqlite3.Row
-    cursor = conn.cursor()
 
     query = ["""
         SELECT
@@ -602,19 +511,16 @@ def get_all_task(
     values.append(limit)
     values.append(offset)
 
-    cursor.execute(query, values)
-
-    tasks = cursor.fetchall()
-
+    result = conn.execute(query, values)
+    tasks = [_as_dict(row) for row in result.rows]
     conn.close()
-
     return tasks
 
-def count_task(user_id,search,status,priority):
-    conn=get_connetion()
-    cursor=conn.cursor()
-    qurey=["SELECT COUNT (*) FROM tasks WHERE user_id = ?"]
-    values=[user_id]
+
+def count_task(user_id, search, status, priority):
+    conn = get_connetion()
+    qurey = ["SELECT COUNT (*) FROM tasks WHERE user_id = ?"]
+    values = [user_id]
     if search:
         qurey.append("AND LOWER(title) LIKE ?")
         values.append(f"%{search}%")
@@ -624,22 +530,18 @@ def count_task(user_id,search,status,priority):
     if priority:
         qurey.append("AND priority = ?")
         values.append(priority)
-    qurey=" ".join(qurey)
-    
-    cursor.execute(qurey,values)
-    total_task=cursor.fetchone()[0]
+    qurey = " ".join(qurey)
+
+    result = conn.execute(qurey, values)
+    row = result.rows[0] if result.rows else None
+    total_task = row[0] if row is not None else 0
     conn.close()
     return total_task
 
+
 def get_specific_task(task_id):
-
     conn = get_connetion()
-
-    conn.row_factory = sqlite3.Row
-
-    cursor = conn.cursor()
-
-    cursor.execute(
+    result = conn.execute(
         """
         SELECT
 
@@ -658,11 +560,8 @@ def get_specific_task(task_id):
         """,
         (task_id,)
     )
-
-    task = cursor.fetchone()
-
+    task = _as_dict(result.rows[0] if result.rows else None)
     conn.close()
-
     return task
 
 
@@ -675,12 +574,8 @@ def update_task(
     due_date,
     category_id
 ):
-
     conn = get_connetion()
-
-    cursor = conn.cursor()
-
-    cursor.execute(
+    result = conn.execute(
         """
         UPDATE tasks
         SET
@@ -702,31 +597,25 @@ def update_task(
             task_id
         )
     )
-
-    conn.commit()
-
-    success = cursor.rowcount == 1
-
+    success = result.rows_affected == 1
     conn.close()
-
     return success
 
 
-def delete_task(user_id,task_id):
-    conn=get_connetion()
-    cursor=conn.cursor()
-    cursor.execute("""DELETE FROM tasks WHERE id = ? AND user_id = ?""",(task_id,user_id))
-    conn.commit()
-    success = cursor.rowcount == 1
+def delete_task(user_id, task_id):
+    conn = get_connetion()
+    result = conn.execute(
+        """DELETE FROM tasks WHERE id = ? AND user_id = ?""",
+        (task_id, user_id)
+    )
+    success = result.rows_affected == 1
     conn.close()
-
     return success
+
 
 def get_user_by_username(username):
-    conn=get_connetion()
-    conn.row_factory=sqlite3.Row
-    cursor=conn.cursor()
-    cursor.execute("""SELECT 
+    conn = get_connetion()
+    result = conn.execute("""SELECT 
                    u.id,
                    u.username,
                    u.email,
@@ -735,17 +624,15 @@ def get_user_by_username(username):
                    FROM users u
                    JOIN roles r
                     ON  u.role_id = r.id 
-                   WHERE u.username = ?""",(username,))
-    user=cursor.fetchone()
+                   WHERE u.username = ?""", (username,))
+    user = _as_dict(result.rows[0] if result.rows else None)
     conn.close()
     return user
 
 
 def get_user_by_email(email):
-    conn=get_connetion()
-    conn.row_factory=sqlite3.Row
-    cursor=conn.cursor()
-    cursor.execute("""SELECT 
+    conn = get_connetion()
+    result = conn.execute("""SELECT 
                    u.id,
                    u.username,
                    u.email,
@@ -755,17 +642,15 @@ def get_user_by_email(email):
                    FROM users u
                    JOIN roles r
                     ON  u.role_id = r.id 
-                   WHERE u.email = ?""",(email,))
-    user=cursor.fetchone()
+                   WHERE u.email = ?""", (email,))
+    user = _as_dict(result.rows[0] if result.rows else None)
     conn.close()
     return user
 
+
 def get_all_role_permissions():
     conn = get_connetion()
-    conn.row_factory = sqlite3.Row
-    cursor = conn.cursor()
-
-    cursor.execute("""
+    result = conn.execute("""
         SELECT
             r.name AS role,
             p.name AS permission
@@ -776,17 +661,14 @@ def get_all_role_permissions():
             ON rp.permission_id = p.id
         ORDER BY r.name, p.name
     """)
-
-    rows = cursor.fetchall()
+    rows = result.rows
     conn.close()
+    return [_as_dict(row) for row in rows]
 
-    return [dict(row) for row in rows]
 
 def role_has_permission(role_name, permission_name):
     conn = get_connetion()
-    cursor = conn.cursor()
-
-    cursor.execute("""
+    result = conn.execute("""
         SELECT 1
         FROM role_permissions rp
         JOIN roles r
@@ -796,27 +678,23 @@ def role_has_permission(role_name, permission_name):
         WHERE r.name = ?
           AND p.name = ?
     """, (role_name, permission_name))
-
-    result = cursor.fetchone()
+    row = result.rows[0] if result.rows else None
     conn.close()
+    return row is not None
 
-    return result is not None
 
-def delete_role_permission(role_id,permission_id):
-    conn=get_connetion()
-    cursor=conn.cursor()
-    cursor.execute("""DELETE FROM role_permissions
-    WHERE role_id = ? AND permission_id = ?""",(role_id,permission_id))
-    conn.commit()
-    deleted=cursor.rowcount > 0
+def delete_role_permission(role_id, permission_id):
+    conn = get_connetion()
+    result = conn.execute("""DELETE FROM role_permissions
+    WHERE role_id = ? AND permission_id = ?""", (role_id, permission_id))
+    deleted = result.rows_affected > 0
     conn.close()
     return deleted
 
+
 def get_all_users():
-    conn=get_connetion()
-    conn.row_factory=sqlite3.Row
-    cursor=conn.cursor()
-    cursor.execute("""SELECT u.id,
+    conn = get_connetion()
+    result = conn.execute("""SELECT u.id,
                     u.username,
                     u.email,
                     r.name AS role
@@ -824,15 +702,14 @@ def get_all_users():
                     JOIN roles r
                         ON u.role_id = r.id
                         ORDER BY u.id""")
-    users=cursor.fetchall()
+    users = [_as_dict(row) for row in result.rows]
     conn.close()
     return users
 
+
 def get_user_by_id(user_id):
-    conn=get_connetion()
-    conn.row_factory=sqlite3.Row
-    cursor=conn.cursor()
-    cursor.execute("""
+    conn = get_connetion()
+    result = conn.execute("""
                 SELECT 
                     u.id,
                     u.username,
@@ -845,27 +722,23 @@ def get_user_by_id(user_id):
                 JOIN roles r
                     ON u.role_id = r.id
                 WHERE u.id = ?
-                """,(user_id,))
-
-    row=cursor.fetchone()
+                """, (user_id,))
+    row = _as_dict(result.rows[0] if result.rows else None)
     conn.close()
     return row
 
+
 def delete_users(user_id):
-    cnn=get_connetion()
-    cursor=cnn.cursor()
-    cursor.execute("DELETE FROM users WHERE id= ?",(user_id,))
-    cnn.commit()
-    success=cursor.rowcount == 1
-    cnn.close()
+    conn = get_connetion()
+    result = conn.execute("DELETE FROM users WHERE id= ?", (user_id,))
+    success = result.rows_affected == 1
+    conn.close()
     return success
+
 
 def get_roles_and_permissions():
     conn = get_connetion()
-    conn.row_factory = sqlite3.Row
-    cursor = conn.cursor()
-
-    cursor.execute("""
+    result = conn.execute("""
         SELECT
             'role' AS type,
             id,
@@ -882,21 +755,14 @@ def get_roles_and_permissions():
 
         ORDER BY type, id
     """)
-
-    data = cursor.fetchall()
-
+    data = [_as_dict(row) for row in result.rows]
     conn.close()
-
     return data
 
 
 def get_role_permissions(role_id):
-
     conn = get_connetion()
-    conn.row_factory = sqlite3.Row
-    cursor = conn.cursor()
-
-    cursor.execute("""
+    result = conn.execute("""
         SELECT
             p.id,
             p.name
@@ -906,20 +772,14 @@ def get_role_permissions(role_id):
         WHERE rp.role_id = ?
         ORDER BY p.id
     """, (role_id,))
-
-    permissions = cursor.fetchall()
-
+    permissions = [_as_dict(row) for row in result.rows]
     conn.close()
-
     return permissions
 
 
 def update_username(user_id, username):
-
     conn = get_connetion()
-
     try:
-
         conn.execute("""
             UPDATE users
             SET username = ?
@@ -928,26 +788,16 @@ def update_username(user_id, username):
             username,
             user_id
         ))
-
-        conn.commit()
-
         return True
-
-    except sqlite3.Error:
-
+    except sqlite3.LibsqlError:
         return False
-
     finally:
-
         conn.close()
 
 
 def set_pending_email(user_id, email):
-
     conn = get_connetion()
-
     try:
-
         conn.execute("""
             UPDATE users
             SET pending_email = ?
@@ -956,26 +806,16 @@ def set_pending_email(user_id, email):
             email,
             user_id
         ))
-
-        conn.commit()
-
         return True
-
-    except sqlite3.Error:
-
+    except sqlite3.LibsqlError:
         return False
-
     finally:
-
         conn.close()
 
 
 def complete_email_change(user_id):
-
     conn = get_connetion()
-
     try:
-
         conn.execute("""
             UPDATE users
             SET email = pending_email,
@@ -984,28 +824,17 @@ def complete_email_change(user_id):
             WHERE id = ?
               AND pending_email IS NOT NULL
         """, (user_id,))
-
-        conn.commit()
-
         return True
-
-    except sqlite3.Error:
-
+    except sqlite3.LibsqlError:
         return False
-
     finally:
-
         conn.close()
 
 
 def update_user_profile(user_id, username, email):
-
     conn = get_connetion()
-    conn.row_factory=sqlite3.Row
-    cursor = conn.cursor()
 
-    # Check if another user already has this email
-    cursor.execute(
+    result = conn.execute(
         """
         SELECT id
         FROM users
@@ -1014,14 +843,13 @@ def update_user_profile(user_id, username, email):
         """,
         (email, user_id)
     )
-
-    existing_user = cursor.fetchone()
+    existing_user = result.rows[0] if result.rows else None
 
     if existing_user:
         conn.close()
         return "Email already exists", None
 
-    cursor.execute(
+    conn.execute(
         """
         UPDATE users
         SET username = ?, email = ?
@@ -1029,10 +857,7 @@ def update_user_profile(user_id, username, email):
         """,
         (username, email, user_id)
     )
-
-    conn.commit()
-
-    cursor.execute(
+    result = conn.execute(
         """
         SELECT 
             u.id,
@@ -1046,52 +871,34 @@ def update_user_profile(user_id, username, email):
         """,
         (user_id,)
     )
-
-    updated_user = cursor.fetchone()
-
+    updated_user = _as_dict(result.rows[0] if result.rows else None)
     conn.close()
-
-    return None, dict(updated_user)
+    return None, updated_user
 
 
 def add_due_date_column():
-
     conn = get_connetion()
-    cursor = conn.cursor()
-
     try:
-
-        cursor.execute("""
+        conn.execute("""
             ALTER TABLE tasks
             ADD COLUMN due_date DATE
         """)
-
-        conn.commit()
-
         print("due_date column added successfully.")
-
     except Exception as e:
-
         print("due_date column already exists or error:", e)
-
     finally:
-
         conn.close()
 
+
 def update_user_role(user_id, role_name):
-
     conn = get_connetion()
-    conn.row_factory = sqlite3.Row
-    cursor = conn.cursor()
 
-    # Get role id from role name
-    cursor.execute("""
+    result = conn.execute("""
         SELECT id
         FROM roles
         WHERE name = ?
     """, (role_name,))
-
-    role = cursor.fetchone()
+    role = _as_dict(result.rows[0] if result.rows else None)
 
     if role is None:
         conn.close()
@@ -1099,40 +906,28 @@ def update_user_role(user_id, role_name):
 
     role_id = role["id"]
 
-    cursor.execute("""
+    result = conn.execute("""
         UPDATE users
         SET role_id = ?
         WHERE id = ?
     """, (role_id, user_id))
-
-    conn.commit()
-
-    success = cursor.rowcount == 1
-
+    success = result.rows_affected == 1
     conn.close()
-
     return success
 
+
 def clear_permissions_for_role(role_id):
-
     conn = get_connetion()
-    cursor = conn.cursor()
-
-    cursor.execute("""
+    conn.execute("""
         DELETE FROM role_permissions
         WHERE role_id = ?
     """, (role_id,))
-
-    conn.commit()
     conn.close()
 
+
 def create_category_table():
-
     conn = get_connetion()
-
-    cursor = conn.cursor()
-
-    cursor.execute("""
+    conn.execute("""
         CREATE TABLE IF NOT EXISTS categories(
 
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1149,37 +944,24 @@ def create_category_table():
 
         )
     """)
-
-    conn.commit()
     conn.close()
 
+
 def add_description_column():
-
     conn = get_connetion()
-
-    cursor = conn.cursor()
-
     try:
-
-        cursor.execute("""
+        conn.execute("""
             ALTER TABLE tasks
             ADD COLUMN description TEXT
         """)
-
     except Exception:
         pass
-
-    conn.commit()
-
     conn.close()
 
+
 def category_exists(user_id, name):
-
     conn = get_connetion()
-
-    cursor = conn.cursor()
-
-    cursor.execute(
+    result = conn.execute(
         """
         SELECT id
         FROM categories
@@ -1188,43 +970,26 @@ def category_exists(user_id, name):
         """,
         (user_id, name)
     )
-
-    row = cursor.fetchone()
-
+    row = result.rows[0] if result.rows else None
     conn.close()
-
     return row is not None
 
 
 def add_category_column():
-
     conn = get_connetion()
-
-    cursor = conn.cursor()
-
     try:
-
-        cursor.execute("""
+        conn.execute("""
             ALTER TABLE tasks
             ADD COLUMN category_id INTEGER
         """)
-
     except Exception:
         pass
-
-    conn.commit()
-
     conn.close()
 
+
 def get_all_categories(user_id):
-
     conn = get_connetion()
-
-    conn.row_factory = sqlite3.Row
-
-    cursor = conn.cursor()
-
-    cursor.execute(
+    result = conn.execute(
         """
         SELECT
             id,
@@ -1235,23 +1000,15 @@ def get_all_categories(user_id):
         """,
         (user_id,)
     )
-
-    categories = cursor.fetchall()
-
+    categories = [_as_dict(row) for row in result.rows]
     conn.close()
-
     return categories
 
 
 def insert_category(user_id, name):
-
     conn = get_connetion()
-
-    cursor = conn.cursor()
-
     try:
-
-        cursor.execute(
+        conn.execute(
             """
             INSERT INTO categories
             (
@@ -1265,27 +1022,16 @@ def insert_category(user_id, name):
                 user_id
             )
         )
-
-        conn.commit()
-
         return True
-
-    except sqlite3.IntegrityError:
-
+    except sqlite3.LibsqlError:
         return False
-
     finally:
-
         conn.close()
 
 
 def delete_category(user_id, category_id):
-
     conn = get_connetion()
-
-    cursor = conn.cursor()
-
-    cursor.execute(
+    result = conn.execute(
         """
         DELETE FROM categories
         WHERE
@@ -1298,11 +1044,6 @@ def delete_category(user_id, category_id):
             user_id
         )
     )
-
-    conn.commit()
-
-    success = cursor.rowcount == 1
-
+    success = result.rows_affected == 1
     conn.close()
-
     return success

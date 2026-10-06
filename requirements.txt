@@ -3,3 +3,4 @@ Flask-JWT-Extended
 python-dotenv
 pytest
 gunicorn
+libsql-client
